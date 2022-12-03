@@ -1,0 +1,137 @@
+import org.gradle.internal.os.OperatingSystem
+
+plugins {
+    id 'java'
+    id 'java-library'
+    id 'maven-publish'
+    id 'org.jetbrains.kotlin.jvm' version '1.5.31'
+}
+
+group 'com.dcrubro'
+version '1.0-SNAPSHOT'
+
+sourceCompatibility = 1.11
+
+repositories {
+    flatDir {
+        dirs 'libs'
+    }
+    mavenCentral()
+}
+
+dependencies {
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+    implementation "org.jetbrains.kotlin:kotlin-script-runtime:1.5.31"
+}
+
+//---start lwjgl/imgui gradle custom---//
+
+project.ext.lwjglVersion = "3.2.3"
+project.ext.jomlVersion = "1.10.3"
+project.ext.imguiVersion = "1.86.4"
+project.ext.log4jVersion = "2.17.2";
+
+jar {
+    manifest {
+        attributes (
+                'Class-Path': configurations.compile.collect { it.getName() }.join(' '),
+                'Main-Class': 'Main'
+        )
+    }
+
+    from {
+        configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
+
+ext {
+    imguiVersion = '1.76-0.9'
+}
+
+switch (OperatingSystem.current()) {
+    case OperatingSystem.LINUX:
+        project.ext.lwjglNatives = "natives-linux"
+        project.ext.imguiNatives = "natives-linux"
+        break
+    case OperatingSystem.MAC_OS:
+        project.ext.lwjglNatives = System.getProperty("os.arch").startsWith("aarch64") ? "natives-macos-arm64" : "natives-macos"
+        project.ext.imguiNatives = "natives-macos"
+        break
+    case OperatingSystem.WINDOWS:
+        project.ext.lwjglNatives = "natives-windows"
+        project.ext.imguiNatives = "natives-windows"
+        break
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    //lwjgl stuff
+    implementation platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
+
+    implementation "org.lwjgl:lwjgl"
+    implementation "org.lwjgl:lwjgl-assimp"
+    implementation "org.lwjgl:lwjgl-glfw"
+    implementation "org.lwjgl:lwjgl-nfd"
+    implementation "org.lwjgl:lwjgl-openal"
+    implementation "org.lwjgl:lwjgl-opengl"
+    implementation "org.lwjgl:lwjgl-stb"
+    runtimeOnly "org.lwjgl:lwjgl::$lwjglNatives"
+    runtimeOnly "org.lwjgl:lwjgl-assimp::$lwjglNatives"
+    runtimeOnly "org.lwjgl:lwjgl-glfw::$lwjglNatives"
+    runtimeOnly "org.lwjgl:lwjgl-nfd::$lwjglNatives"
+    runtimeOnly "org.lwjgl:lwjgl-openal::$lwjglNatives"
+    runtimeOnly "org.lwjgl:lwjgl-opengl::$lwjglNatives"
+    runtimeOnly "org.lwjgl:lwjgl-stb::$lwjglNatives"
+    implementation "org.joml:joml:${jomlVersion}"
+
+    //kotlin stuff
+    implementation platform('org.jetbrains.kotlin:kotlin-bom')
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8'
+    implementation 'com.google.guava:guava:30.1.1-jre'
+    testImplementation 'org.jetbrains.kotlin:kotlin-test'
+    testImplementation 'org.jetbrains.kotlin:kotlin-test-junit'
+    api 'org.apache.commons:commons-math3:3.6.1'
+
+
+    //imgui stuff
+    implementation "io.github.spair:imgui-java-app:1.86.4"
+
+    ['', '-opengl', '-glfw'].each {
+        implementation "org.lwjgl:lwjgl$it:3.2.3"
+        implementation "org.lwjgl:lwjgl$it::$lwjglNatives"
+    }
+
+    implementation "io.github.spair:imgui-java-binding:1.86.4"
+    implementation "io.github.spair:imgui-java-lwjgl3:1.86.4"
+
+    implementation "io.github.spair:imgui-java-$imguiNatives:1.86.4"
+
+    //log4j stuff
+    implementation 'org.apache.logging.log4j:log4j-api:2.17.2'
+    implementation 'org.apache.logging.log4j:log4j-core:2.17.2'
+
+    //GSON stuff
+    implementation 'com.google.code.gson:gson:2.9.0'
+}
+//--- end lwjgl/imgui gradle custom---//
+
+//tasks
+task fatJar(type: Jar) {
+    manifest.from jar.manifest
+    classifier = 'all'
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    } {
+        exclude "META-INF/*.SF"
+        exclude "META-INF/*.DSA"
+        exclude "META-INF/*.RSA"
+    }
+    with jar
+}
+
+artifacts {
+    archives fatJar
+}
